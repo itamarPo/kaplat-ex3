@@ -6,8 +6,6 @@ import com.example.kaplatex3.model.ToDoJsonClass;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.gson.GsonProperties;
-import org.springframework.boot.json.GsonJsonParser;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -16,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -89,9 +86,37 @@ public class ToDoController {
     }
 
     @PutMapping()
-    public ResponseEntity<Object> updateToDo(@RequestParam int todoNumber, @RequestParam String status){
+    public ResponseEntity<Object> updateToDo(@RequestParam Integer todoNumber, @RequestParam String status){
+        ResultClass<String> resultClass = new ResultClass<>("","");
+        ToDoClass todoFromId;
+        String oldStatus;
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
         if(!(status.equals("PENDING") || status.equals("LATE") || status.equals("DONE"))){
-
+            return new ResponseEntity<>(HttpStatusCode.valueOf(400));
         }
+        todoFromId = logicEngine.getTodoByID(toDoClassList, todoNumber);
+        if(todoFromId == null) {
+            resultClass.setError("Error: no such TODO with id " + todoNumber.toString());
+            return new ResponseEntity<>(gson.toJson(resultClass),HttpStatusCode.valueOf(404));
+        }
+        oldStatus = todoFromId.getStatus();
+        todoFromId.setStatus(status);
+        resultClass.setResult(oldStatus);
+        return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
+    }
+
+    @DeleteMapping()
+    public ResponseEntity<Object> deleteToDo(@RequestParam Integer todoNumber){
+        ResultClass<Integer> resultClass = new ResultClass<>(toDoClassList.size(), "");
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        for(ToDoClass todo: toDoClassList){
+            if(todo.getId().equals(todoNumber)) {
+                toDoClassList.remove(todo);
+                resultClass.setResult(toDoClassList.size());
+                return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
+            }
+        }
+        resultClass.setError("Error: no such TODO with id " + todoNumber.toString());
+        return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(404));
     }
 }

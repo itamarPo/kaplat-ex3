@@ -3,7 +3,6 @@ package com.example.kaplatex3.controller;
 import com.example.kaplatex3.model.ToDoClass;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,5 +38,13 @@ public class LogicToDo {
         else
             returnList = todoList.stream().sorted(Comparator.comparing(ToDoClass::getTitle)).collect(Collectors.toList());
         return returnList;
+    }
+
+    public ToDoClass getTodoByID(List<ToDoClass> todoList, Integer id){
+        for(ToDoClass todo: todoList){
+            if(todo.getId().equals(id))
+                return todo;
+        }
+        return null;
     }
 }

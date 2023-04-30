@@ -3,7 +3,7 @@ package com.example.kaplatex3.model;
 import java.util.Date;
 
 public class ToDoClass {
-    private int id;
+    private Integer id;
     private String title;
     private String content;
     private Long dueDate;
@@ -21,7 +21,7 @@ public class ToDoClass {
         Status = status;
     }
 
-    public int getId() {
+    public Integer getId() {
         return id;
     }
 

@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping(path = "/todo")
@@ -67,6 +68,30 @@ public class ToDoController {
         }
         else {
             return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(400));
+        }
+    }
+
+    @GetMapping("/content")
+    public ResponseEntity<Object> getTodoData(@RequestParam String status, @RequestParam String sortBy){
+        ResultClass<List<ToDoClass>> resultClass = new ResultClass<>(new ArrayList<>(),"");
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        if(!(sortBy.equals("") || sortBy.equals("ID") || sortBy.equals("DUE_DATE") || sortBy.equals("TITLE")) &&
+                !(status.equals("ALL") || status.equals("PENDING") || status.equals("LATE") || status.equals("DONE")))
+            return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(400));
+        if(status.equals("ALL")){
+            resultClass.setResult(logicEngine.sortList(toDoClassList,sortBy));
+        }
+        else{
+            resultClass.setResult(logicEngine.sortList(toDoClassList.stream().filter(
+                    l -> l.getStatus().equals(status)).collect(Collectors.toList()), sortBy));
+        }
+        return new ResponseEntity<>(gson.toJson(resultClass), HttpStatus.OK);
+    }
+
+    @PutMapping()
+    public ResponseEntity<Object> updateToDo(@RequestParam int todoNumber, @RequestParam String status){
+        if(!(status.equals("PENDING") || status.equals("LATE") || status.equals("DONE"))){
+
         }
     }
 }

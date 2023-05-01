@@ -86,7 +86,7 @@ public class ToDoController {
     }
 
     @PutMapping()
-    public ResponseEntity<Object> updateToDo(@RequestParam Integer todoNumber, @RequestParam String status){
+    public ResponseEntity<Object> updateToDo(@RequestParam Integer id, @RequestParam String status){
         ResultClass<String> resultClass = new ResultClass<>("","");
         ToDoClass todoFromId;
         String oldStatus;
@@ -94,9 +94,9 @@ public class ToDoController {
         if(!(status.equals("PENDING") || status.equals("LATE") || status.equals("DONE"))){
             return new ResponseEntity<>(HttpStatusCode.valueOf(400));
         }
-        todoFromId = logicEngine.getTodoByID(toDoClassList, todoNumber);
+        todoFromId = logicEngine.getTodoByID(toDoClassList, id);
         if(todoFromId == null) {
-            resultClass.setError("Error: no such TODO with id " + todoNumber.toString());
+            resultClass.setError("Error: no such TODO with id " + id.toString());
             return new ResponseEntity<>(gson.toJson(resultClass),HttpStatusCode.valueOf(404));
         }
         oldStatus = todoFromId.getStatus();
@@ -106,17 +106,17 @@ public class ToDoController {
     }
 
     @DeleteMapping()
-    public ResponseEntity<Object> deleteToDo(@RequestParam Integer todoNumber){
+    public ResponseEntity<Object> deleteToDo(@RequestParam Integer id){
         ResultClass<Integer> resultClass = new ResultClass<>(toDoClassList.size(), "");
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         for(ToDoClass todo: toDoClassList){
-            if(todo.getId().equals(todoNumber)) {
+            if(todo.getId().equals(id)) {
                 toDoClassList.remove(todo);
                 resultClass.setResult(toDoClassList.size());
                 return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
             }
         }
-        resultClass.setError("Error: no such TODO with id " + todoNumber.toString());
+        resultClass.setError("Error: no such TODO with id " + id.toString());
         return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(404));
     }
 }

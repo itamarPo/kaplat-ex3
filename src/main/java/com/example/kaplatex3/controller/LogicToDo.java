@@ -13,9 +13,9 @@ public class LogicToDo {
     public boolean checkIfTodoExist(List<ToDoClass> todoList, String title){
         for(ToDoClass todo: todoList){
             if(todo.getTitle().equals(title))
-                return false;
+                return true;
         }
-        return true;
+        return false;
     }
 
     public int CountByStatus(List<ToDoClass> todoList, String status){

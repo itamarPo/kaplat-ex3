@@ -2,11 +2,11 @@ package com.example.kaplatex3.model;
 
 public class ResultClass <T>{
     private T result;
-    private String error;
+    private String errorMessage;
 
     public ResultClass(T result, String error) {
         this.result = result;
-        this.error = error;
+        this.errorMessage = error;
     }
 
     public void setResult(T result) {
@@ -14,6 +14,6 @@ public class ResultClass <T>{
     }
 
     public void setError(String error) {
-        this.error = error;
+        this.errorMessage = error;
     }
 }

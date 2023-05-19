@@ -1,8 +1,6 @@
 package com.example.kaplatex3.controller;
 
-import com.example.kaplatex3.model.ResultClass;
-import com.example.kaplatex3.model.ToDoClass;
-import com.example.kaplatex3.model.ToDoJsonClass;
+import com.example.kaplatex3.model.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +45,7 @@ public class ToDoController {
         }
         this.currentID++;
         toDoClassList.add(new ToDoClass(this.currentID, todo.getTitle(), todo.getContent(), todo.getDueDate(), "PENDING"));
-        ResultClass<ToDoClass> resultClass = new ResultClass<>(toDoClassList.get(toDoClassList.size()-1),"");
+        FirstResultClass resultClass = new FirstResultClass(toDoClassList.get(toDoClassList.size()-1).getId());
 
         return new ResponseEntity<>(gson.toJson(resultClass), HttpStatus.OK);
     }
@@ -70,7 +68,7 @@ public class ToDoController {
 
     @GetMapping("/content")
     public ResponseEntity<Object> getTodoData(@RequestParam String status, @RequestParam String sortBy){
-        ResultClass<List<ToDoClass>> resultClass = new ResultClass<>(new ArrayList<>(),"");
+        ContentResultClass<List<ToDoClass>> resultClass = new ContentResultClass<>(new ArrayList<>());
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         if(!(sortBy.equals("") || sortBy.equals("ID") || sortBy.equals("DUE_DATE") || sortBy.equals("TITLE")) &&
                 !(status.equals("ALL") || status.equals("PENDING") || status.equals("LATE") || status.equals("DONE")))
@@ -116,7 +114,7 @@ public class ToDoController {
                 return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
             }
         }
-        resultClass.setError("Error: no such TODO with id " + id.toString());
-        return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(404));
+        DeleteErrorClass deleteResultClass = new DeleteErrorClass("Error: no such TODO with id " + id.toString());
+        return new ResponseEntity<>(gson.toJson(deleteResultClass), HttpStatusCode.valueOf(404));
     }
 }

@@ -27,7 +27,7 @@
 
 
     <appender name="TODO" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/independent.log</file>
+        <file>logs/todos.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>logs/todos.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
@@ -47,7 +47,7 @@
     </logger>
 
     <logger name="todo-logger" level="DEBUG">
-        <appender-ref ref="INDEPENDENT"/>
+        <appender-ref ref="TODO"/>
     </logger>
 
 

@@ -16,4 +16,8 @@ public class ResultClass <T>{
     public void setError(String error) {
         this.errorMessage = error;
     }
+
+    public T getResult() {
+        return result;
+    }
 }

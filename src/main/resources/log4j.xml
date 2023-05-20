@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>logs/requests.log</file>
+        <encoder>
+            <pattern>%d{dd-MM-yyyy HH:mm:ss.SSS} %level: %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{dd-MM-yyyy HH:mm:ss.SSS} %level: %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="STACK" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/stack.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/stack.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level: %msg%n</pattern>
+        </encoder>
+    </appender>
+
+
+    <appender name="TODO" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/independent.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/todos.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{dd-MM-yyyy HH:mm:ss.SSS} %-5level: %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="request-logger" level="INFO">
+        <appender-ref ref="FILE" />
+        <appender-ref ref="STDOUT" />
+    </logger>
+
+    <logger name="stack-logger" level="INFO" additivity="false">
+        <appender-ref ref="STACK" />
+    </logger>
+
+    <logger name="todo-logger" level="DEBUG">
+        <appender-ref ref="INDEPENDENT"/>
+    </logger>
+
+
+
+</configuration>

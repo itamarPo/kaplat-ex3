@@ -3,6 +3,8 @@ package com.example.kaplatex3.controller;
 import com.example.kaplatex3.model.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -22,27 +24,64 @@ public class ToDoController {
     List<ToDoClass> toDoClassList;
     LogicToDo logicEngine;
     int currentID;
+    private int requestLogNumber;
+    private static final Logger requestLogger = LoggerFactory.getLogger("request-logger");
+   // private static final Logger stackLogger = LoggerFactory.getLogger("stack-logger");
+    private static final Logger todoLogger = LoggerFactory.getLogger("todo-logger");
     @Autowired
     public ToDoController(LogicToDo logicEngine) {
         this.toDoClassList = new ArrayList<>();
         this.logicEngine = logicEngine;
         this.currentID = 0;
+        this.requestLogNumber = 1;
+    }
+
+    public void handleLogRequest(String resource, String verb){
+        requestLogger.info("Incoming request | #" + requestLogNumber + " | resource: " + resource + " | HTTP Verb " + verb.toUpperCase());
+        requestLogNumber++;
+    }
+
+    public void handleLogDebugRequest(long duration){
+        requestLogger.debug("request #" + (requestLogNumber - 1) +" duration: " + duration + "ms");
     }
 
     @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<Object> createNewTodo(@RequestBody ToDoJsonClass todo){
+        long startTime = System.currentTimeMillis();
+        long endTime;
+        handleLogRequest("/todo", "POST");
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
         if(logicEngine.checkIfTodoExist(toDoClassList, todo.getTitle())){
             ResultClass<String> resultClass = new ResultClass<>("", "Error: TODO with the title  [" + todo.getTitle()
                     + "] already exists in the system");
-           return new ResponseEntity<>(gson.toJson(resultClass)
-                   , HttpStatusCode.valueOf(409));
+            if(requestLogger.isDebugEnabled()){
+                endTime = System.currentTimeMillis();
+                handleLogDebugRequest(endTime - startTime);
+            }
+            todoLogger.error("Error: TODO with the title  [" + todo.getTitle() + "] already exists in the system");
+           return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(409));
         }
+
         if(Instant.now().toEpochMilli() >= todo.getDueDate()){
             ResultClass<String> resultClass = new ResultClass<>("", "Error: Can’t create new TODO that its due date is in the past");
+            if(requestLogger.isDebugEnabled()){
+                endTime = System.currentTimeMillis();
+                handleLogDebugRequest(endTime - startTime);
+            }
+            todoLogger.error("Error: Can’t create new TODO that its due date is in the past");
             return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(409));
         }
+
+        endTime = System.currentTimeMillis();
+        todoLogger.info("Creating new TODO with Title [" +  todo.getTitle() + "]");
+        if(todoLogger.isDebugEnabled()) {
+            todoLogger.debug("Currently there are " + this.currentID + " TODOs in the system. New TODO will be assigned with id " + this.currentID + 1);
+        }
+        if(requestLogger.isDebugEnabled()){
+            handleLogDebugRequest(endTime - startTime);
+        }
+
         this.currentID++;
         toDoClassList.add(new ToDoClass(this.currentID, todo.getTitle(), todo.getContent(), todo.getDueDate(), "PENDING"));
         FirstResultClass resultClass = new FirstResultClass(toDoClassList.get(toDoClassList.size()-1).getId());
@@ -53,15 +92,34 @@ public class ToDoController {
     @GetMapping("/size")
     public ResponseEntity<Object> countToDoByFilter(@RequestParam String status){
         ResultClass<Integer> resultClass = new ResultClass<>(0,"");
+        handleLogRequest("/todo/size", "GET");
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        long startTime = System.currentTimeMillis();
+        long endTime;
+
         if(status.equals("ALL")){
             resultClass.setResult(toDoClassList.size());
+            if(requestLogger.isDebugEnabled()){
+                endTime = System.currentTimeMillis();
+                handleLogDebugRequest(endTime - startTime);
+            }
+            todoLogger.info("Total TODOs count for state " + status + " is " + toDoClassList.size());
             return new ResponseEntity<>(gson.toJson(resultClass), HttpStatus.OK);
+
         } else if (status.equals("PENDING") || status.equals("LATE") || status.equals("DONE")) {
             resultClass.setResult(logicEngine.CountByStatus(toDoClassList,status));
+            if(requestLogger.isDebugEnabled()){
+                endTime = System.currentTimeMillis();
+                handleLogDebugRequest(endTime - startTime);
+            }
+            todoLogger.info("Total TODOs count for state " + status + " is " + resultClass.getResult());
             return new ResponseEntity<>(gson.toJson(resultClass), HttpStatus.OK);
         }
         else {
+            if(requestLogger.isDebugEnabled()){
+                endTime = System.currentTimeMillis();
+                handleLogDebugRequest(endTime - startTime);
+            }
             return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(400));
         }
     }
@@ -69,16 +127,36 @@ public class ToDoController {
     @GetMapping("/content")
     public ResponseEntity<Object> getTodoData(@RequestParam String status, @RequestParam String sortBy){
         ContentResultClass<List<ToDoClass>> resultClass = new ContentResultClass<>(new ArrayList<>());
+        long endTime, startTime = System.currentTimeMillis();
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        List<ToDoClass> filterdList;
+        handleLogRequest("/todo/content", "GET");
+
         if(!(sortBy.equals("") || sortBy.equals("ID") || sortBy.equals("DUE_DATE") || sortBy.equals("TITLE")) &&
-                !(status.equals("ALL") || status.equals("PENDING") || status.equals("LATE") || status.equals("DONE")))
+                !(status.equals("ALL") || status.equals("PENDING") || status.equals("LATE") || status.equals("DONE"))) {
+            if(requestLogger.isDebugEnabled()){
+                endTime = System.currentTimeMillis();
+                handleLogDebugRequest(endTime - startTime);
+            }
             return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(400));
+        }
         if(status.equals("ALL")){
-            resultClass.setResult(logicEngine.sortList(toDoClassList,sortBy));
+            filterdList = logicEngine.sortList(toDoClassList,sortBy);
+            resultClass.setResult(filterdList);
         }
         else{
-            resultClass.setResult(logicEngine.sortList(toDoClassList.stream().filter(
-                    l -> l.getStatus().equals(status)).collect(Collectors.toList()), sortBy));
+            filterdList = logicEngine.sortList(toDoClassList.stream().filter(
+                    l -> l.getStatus().equals(status)).collect(Collectors.toList()), sortBy);
+            resultClass.setResult(filterdList);
+        }
+        if(requestLogger.isDebugEnabled()){
+            endTime = System.currentTimeMillis();
+            handleLogDebugRequest(endTime - startTime);
+        }
+        todoLogger.info("Extracting todos content. Filter: " + status + " | Sorting by: " + sortBy);
+        if(todoLogger.isDebugEnabled()){
+            todoLogger.debug("There are a total of " + toDoClassList.size() +
+                    "todos in the system. The result holds " + filterdList.size() + " todos");
         }
         return new ResponseEntity<>(gson.toJson(resultClass), HttpStatus.OK);
     }
@@ -87,34 +165,73 @@ public class ToDoController {
     public ResponseEntity<Object> updateToDo(@RequestParam Integer id, @RequestParam String status){
         ResultClass<String> resultClass = new ResultClass<>("","");
         ToDoClass todoFromId;
+        long endTime, startTime = System.currentTimeMillis();
         String oldStatus;
+        handleLogRequest("/todo", "PUT");
+        todoLogger.info("Update TODO id [" + id + "] state to " + status);
+
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         if(!(status.equals("PENDING") || status.equals("LATE") || status.equals("DONE"))){
+            if(requestLogger.isDebugEnabled()){
+                endTime = System.currentTimeMillis();
+                handleLogDebugRequest(endTime - startTime);
+            }
             return new ResponseEntity<>(HttpStatusCode.valueOf(400));
         }
+
         todoFromId = logicEngine.getTodoByID(toDoClassList, id);
         if(todoFromId == null) {
             resultClass.setError("Error: no such TODO with id " + id.toString());
+            if(requestLogger.isDebugEnabled()){
+                endTime = System.currentTimeMillis();
+                handleLogDebugRequest(endTime - startTime);
+            }
+            todoLogger.error("Error: no such TODO with id " + id);
             return new ResponseEntity<>(gson.toJson(resultClass),HttpStatusCode.valueOf(404));
         }
+
         oldStatus = todoFromId.getStatus();
         todoFromId.setStatus(status);
         resultClass.setResult(oldStatus);
+        if(requestLogger.isDebugEnabled()){
+            endTime = System.currentTimeMillis();
+            handleLogDebugRequest(endTime - startTime);
+        }
+        if(todoLogger.isDebugEnabled()){
+            todoLogger.debug("Todo id [{todo ID}] state change: " + oldStatus + "--> " + status);
+        }
         return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
     }
 
     @DeleteMapping()
     public ResponseEntity<Object> deleteToDo(@RequestParam Integer id){
         ResultClass<Integer> resultClass = new ResultClass<>(toDoClassList.size(), "");
+        long endTime, startTime = System.currentTimeMillis();
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        handleLogRequest("/todo", "DELETE");
+
+
         for(ToDoClass todo: toDoClassList){
             if(todo.getId().equals(id)) {
                 toDoClassList.remove(todo);
                 resultClass.setResult(toDoClassList.size());
+                if(requestLogger.isDebugEnabled()){
+                    endTime = System.currentTimeMillis();
+                    handleLogDebugRequest(endTime - startTime);
+                }
+                todoLogger.info("Removing todo id " + id);
+                if(todoLogger.isDebugEnabled()){
+                    todoLogger.debug("After removing todo id [" + id + "] there are " + toDoClassList.size() + " TODOs in the system");
+                }
                 return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
             }
         }
         DeleteErrorClass deleteResultClass = new DeleteErrorClass("Error: no such TODO with id " + id.toString());
+        todoLogger.error("Error: no such TODO with id " + id);
+        if(requestLogger.isDebugEnabled()){
+            endTime = System.currentTimeMillis();
+            handleLogDebugRequest(endTime - startTime);
+        }
         return new ResponseEntity<>(gson.toJson(deleteResultClass), HttpStatusCode.valueOf(404));
     }
 }

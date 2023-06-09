@@ -32,6 +32,10 @@
                 <version>2.10.1</version>
                 <scope>compile</scope>
             </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -43,14 +47,5 @@
             </plugin>
         </plugins>
     </build>
-    <distributionManagement>
-        <repository>
-            <id>kaplat-ex3</id>
-            <name>kaplat-ex3</name>
-            <url>
-                http://127.
-            </url>
-        </repository>
-    </distributionManagement>
 
 </project>

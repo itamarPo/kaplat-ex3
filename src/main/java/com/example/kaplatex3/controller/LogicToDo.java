@@ -7,6 +7,7 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Filters;
 import org.bson.BsonDocument;
 import org.bson.BsonInt64;
 import org.bson.Document;
@@ -123,5 +124,29 @@ public class LogicToDo {
         }
         else{}
         return sortList(todoList, sortBy);
+    }
+
+    public ToDoClass getTodoByIDFromDataBase(Integer id) {
+        ToDoClass toDoClass = getToDoClassFromMongo();
+       if(getToDoClassFromMongo().equals(getToDoClassFromPostGres()))
+           return toDoClass;
+       else
+           return null;
+    }
+
+    private Integer getToDoClassFromPostGres() {
+    }
+
+    private ToDoClass getToDoClassFromMongo() {
+        MongoCollection<Document> collection = mongoDatabase.getCollection("todos");
+        Bson filter = Filters.eq("rawid", 1);
+        Document todoDoc = collection.find(filter).first();
+        if(todoDoc != null){
+            ToDoClass todo = new ToDoClass(todoDoc.getInteger("rawid"), todoDoc.getString("title"),
+                    todoDoc.getString("content"), todoDoc.getLong("duedate"), todoDoc.getString("state"));
+            return todo;
+        }
+        else
+            return null;
     }
 }

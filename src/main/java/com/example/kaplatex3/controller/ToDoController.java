@@ -239,7 +239,9 @@ public class ToDoController {
             return new ResponseEntity<>(HttpStatusCode.valueOf(400));
         }
 
-        todoFromId = logicEngine.getTodoByID(toDoClassList, id);
+
+        //todoFromId = logicEngine.getTodoByID(toDoClassList, id);
+        todoFromId = logicEngine.getTodoByIDFromDataBase(id);
         if(todoFromId == null) {
             resultClass.setError("Error: no such TODO with id " + id.toString());
             if(requestLogger.isDebugEnabled()){

@@ -3,6 +3,11 @@ package com.example.kaplatex3.controller;
 import com.example.kaplatex3.model.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.mongodb.*;
+import org.bson.BsonDocument;
+import org.bson.BsonInt64;
+import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +16,10 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoDatabase;
+
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,6 +44,28 @@ public class ToDoController {
         this.logicEngine = logicEngine;
         this.currentID = 0;
         this.requestLogNumber = 0;
+        this.ConnectToMongoDB();
+    }
+
+    private void ConnectToMongoDB() {
+        ServerApi serverApi = ServerApi.builder()
+                .version(ServerApiVersion.V1)
+                .build();
+        MongoClientSettings settings = MongoClientSettings.builder()
+                .applyConnectionString(new ConnectionString("localhost:27017"))
+                .serverApi(serverApi)
+                .build();
+        try (MongoClient mongoClient = MongoClients.create(settings)) {
+            MongoDatabase database = mongoClient.getDatabase("admin");
+            try {
+                // Send a ping to confirm a successful connection
+                Bson command = new BsonDocument("ping", new BsonInt64(1));
+                Document commandResult = database.runCommand(command);
+                System.out.println("Pinged your deployment. You successfully connected to MongoDB!");
+            } catch (MongoException me) {
+                System.err.println(me);
+            }
+        }
     }
 
     public static String logEndAddition(){
@@ -95,7 +126,8 @@ public class ToDoController {
     }
 
     @GetMapping("/size")
-    public ResponseEntity<Object> countToDoByFilter(@RequestParam String status){
+    public ResponseEntity<Object> countToDoByFilter(@RequestParam String status,
+                                                    @RequestParam(required = false) String persistenceMethod){
         ResultClass<Integer> resultClass = new ResultClass<>(0,"");
         handleLogRequest("/todo/size", "GET");
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -103,7 +135,11 @@ public class ToDoController {
         long endTime;
 
         if(status.equals("ALL")){
-            resultClass.setResult(toDoClassList.size());
+            if(persistenceMethod.equals("MONGO") || persistenceMethod.equals("POSTGRES")) {
+                resultClass.setResult(logicEngine.CountTodoFromDataBase(persistenceMethod));
+            }
+            else
+                resultClass.setResult(toDoClassList.size());
             if(requestLogger.isDebugEnabled()){
                 endTime = System.currentTimeMillis();
                 handleLogDebugRequest(endTime - startTime);
@@ -112,7 +148,11 @@ public class ToDoController {
             return new ResponseEntity<>(gson.toJson(resultClass), HttpStatus.OK);
 
         } else if (status.equals("PENDING") || status.equals("LATE") || status.equals("DONE")) {
-            resultClass.setResult(logicEngine.CountByStatus(toDoClassList,status));
+            if(persistenceMethod.equals("MONGO") || persistenceMethod.equals("POSTGRES")) {
+                resultClass.setResult(logicEngine.CountTodoFromDataBase(persistenceMethod, status));
+            }
+            else
+                resultClass.setResult(logicEngine.CountByStatus(toDoClassList,status));
             if(requestLogger.isDebugEnabled()){
                 endTime = System.currentTimeMillis();
                 handleLogDebugRequest(endTime - startTime);
@@ -130,7 +170,9 @@ public class ToDoController {
     }
 
     @GetMapping("/content")
-    public ResponseEntity<Object> getTodoData(@RequestParam String status, @RequestParam(required = false) String sortBy){
+    public ResponseEntity<Object> getTodoData(@RequestParam String status,
+                                              @RequestParam(required = false) String sortBy,
+                                              @RequestParam(required = false) String persistenceMethod){
         ContentResultClass<List<ToDoClass>> resultClass = new ContentResultClass<>(new ArrayList<>());
         long endTime, startTime = System.currentTimeMillis();
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -150,12 +192,21 @@ public class ToDoController {
             return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(400));
         }
         if(status.equals("ALL")){
-            filterdList = logicEngine.sortList(toDoClassList,sortBy);
+            if(persistenceMethod == null)
+                filterdList = logicEngine.sortList(toDoClassList,sortBy);
+            else
+                filterdList = logicEngine.sortListFromDataBase(sortBy, persistenceMethod);
             resultClass.setResult(filterdList);
         }
         else{
-            filterdList = logicEngine.sortList(toDoClassList.stream().filter(
-                    l -> l.getStatus().equals(status)).collect(Collectors.toList()), sortBy);
+            if(persistenceMethod == null) {
+                filterdList = logicEngine.sortList(toDoClassList.stream().filter(
+                        l -> l.getStatus().equals(status)).collect(Collectors.toList()), sortBy);
+            }
+            else{
+                filterdList = logicEngine.sortListFromDataBase(sortBy, persistenceMethod);
+                filterdList = filterdList.stream().filter(l->l.getStatus().equals(status)).collect(Collectors.toList());
+            }
             resultClass.setResult(filterdList);
         }
         if(requestLogger.isDebugEnabled()){

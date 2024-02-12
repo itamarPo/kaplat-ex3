@@ -87,7 +87,7 @@ public class ToDoController {
         handleLogRequest("/todo", "POST");
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-        if(logicEngine.checkIfTodoExist(toDoClassList, todo.getTitle())){
+        if(logicEngine.checkIfTodoFromDataBasesExist(todo.getTitle())){
             ResultClass<String> resultClass = new ResultClass<>("", "Error: TODO with the title  [" + todo.getTitle()
                     + "] already exists in the system");
             if(requestLogger.isDebugEnabled()){
@@ -117,6 +117,11 @@ public class ToDoController {
         if(requestLogger.isDebugEnabled()){
             handleLogDebugRequest(endTime - startTime);
         }
+
+        try {
+            logicEngine.createNewTodoInDataBases(todo);
+        }
+        catch (Exception exception){}
 
         this.currentID++;
         toDoClassList.add(new ToDoClass(this.currentID, todo.getTitle(), todo.getContent(), todo.getDueDate(), "PENDING"));
@@ -253,7 +258,15 @@ public class ToDoController {
         }
 
         oldStatus = todoFromId.getStatus();
-        todoFromId.setStatus(status);
+        try {
+            logicEngine.UpdateDataBasesStatusByID(status, todoFromId.getId());
+            resultClass.setResult(oldStatus);
+        }
+        catch (Exception exception){
+            resultClass.setError("Error: error in the data base- details:\n" + exception.getMessage());
+            return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(500));
+        }
+        //todoFromId.setStatus(status);
         resultClass.setResult(oldStatus);
         if(requestLogger.isDebugEnabled()){
             endTime = System.currentTimeMillis();

@@ -1,6 +1,7 @@
 package com.example.kaplatex3.controller;
 
 import com.example.kaplatex3.model.ToDoClass;
+import com.example.kaplatex3.model.ToDoJsonClass;
 import com.mongodb.*;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -126,9 +127,9 @@ public class LogicToDo {
         return sortList(todoList, sortBy);
     }
 
-    public ToDoClass getTodoByIDFromDataBase(Integer id) {
-        ToDoClass toDoClass = getToDoClassFromMongo();
-       if(getToDoClassFromMongo().equals(getToDoClassFromPostGres()))
+    public ToDoClass getTodoByIDFromDataBase(Integer rawID) {
+        ToDoClass toDoClass = getToDoClassFromMongo(rawID);
+       if(toDoClass.equals(getToDoClassFromPostGres()))
            return toDoClass;
        else
            return null;
@@ -137,9 +138,9 @@ public class LogicToDo {
     private Integer getToDoClassFromPostGres() {
     }
 
-    private ToDoClass getToDoClassFromMongo() {
+    private ToDoClass getToDoClassFromMongo(Integer rawID) {
         MongoCollection<Document> collection = mongoDatabase.getCollection("todos");
-        Bson filter = Filters.eq("rawid", 1);
+        Bson filter = Filters.eq("rawid", rawID);
         Document todoDoc = collection.find(filter).first();
         if(todoDoc != null){
             ToDoClass todo = new ToDoClass(todoDoc.getInteger("rawid"), todoDoc.getString("title"),
@@ -148,5 +149,38 @@ public class LogicToDo {
         }
         else
             return null;
+    }
+
+    public void UpdateDataBasesStatusByID(String newStatus, int rawID) throws Exception {
+        MongoCollection<Document> collection = mongoDatabase.getCollection("todos");
+        Document filter = new Document("rawid",rawID);
+        Document update = new Document("$set", new Document("status", newStatus));
+        try {
+            collection.updateOne(filter, update);
+        }
+        catch (Exception exception){
+            throw exception;
+        }
+    }
+
+    public boolean checkIfTodoFromDataBasesExist(String title) {
+        return checkIfTodoExistInMongo(title) && checkIfTodoExistInPostGres(title);
+    }
+
+    private boolean checkIfTodoExistInPostGres(String title) {
+        return false;
+    }
+
+    private boolean checkIfTodoExistInMongo(String title) {
+        MongoCollection<Document> collection = mongoDatabase.getCollection("todos");
+        Bson filter = Filters.eq("title", title);
+        if(collection.find(filter).first() != null)
+            return true;
+        return false;
+    }
+
+    public Integer createNewTodoInDataBases(ToDoJsonClass newTodo) {
+        MongoCollection<Document> collection = mongoDatabase.getCollection("todos");
+        
     }
 }

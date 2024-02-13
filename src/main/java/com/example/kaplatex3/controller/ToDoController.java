@@ -84,6 +84,7 @@ public class ToDoController {
     public ResponseEntity<Object> createNewTodo(@RequestBody ToDoJsonClass todo){
         long startTime = System.currentTimeMillis();
         long endTime;
+        Integer maxRawId;
         handleLogRequest("/todo", "POST");
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
@@ -119,15 +120,18 @@ public class ToDoController {
         }
 
         try {
-            logicEngine.createNewTodoInDataBases(todo);
+           maxRawId = logicEngine.createNewTodoInDataBases(todo);
+           FirstResultClass resultClass = new FirstResultClass(maxRawId);
+           return new ResponseEntity<>(gson.toJson(resultClass), HttpStatus.OK);
         }
-        catch (Exception exception){}
+        catch (Exception exception){
+            System.out.println(exception.getMessage());
+            ResultClass<String> resultClass = new ResultClass<>("", "Error: " + exception.getMessage());
+            return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(500));
+        }
 
-        this.currentID++;
-        toDoClassList.add(new ToDoClass(this.currentID, todo.getTitle(), todo.getContent(), todo.getDueDate(), "PENDING"));
-        FirstResultClass resultClass = new FirstResultClass(toDoClassList.get(toDoClassList.size()-1).getId());
-
-        return new ResponseEntity<>(gson.toJson(resultClass), HttpStatus.OK);
+        //this.currentID++;
+        //toDoClassList.add(new ToDoClass(this.currentID, todo.getTitle(), todo.getContent(), todo.getDueDate(), "PENDING"));
     }
 
     @GetMapping("/size")
@@ -138,10 +142,16 @@ public class ToDoController {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         long startTime = System.currentTimeMillis();
         long endTime;
+        int rawIDCount;
 
         if(status.equals("ALL")){
             if(persistenceMethod.equals("MONGO") || persistenceMethod.equals("POSTGRES")) {
-                resultClass.setResult(logicEngine.CountTodoFromDataBase(persistenceMethod));
+                rawIDCount = logicEngine.CountTodoFromDataBase(persistenceMethod);
+                if(rawIDCount != -1)
+                    resultClass.setResult(rawIDCount);
+                else{
+                    return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(500));
+                }
             }
             else
                 resultClass.setResult(toDoClassList.size());
@@ -154,7 +164,11 @@ public class ToDoController {
 
         } else if (status.equals("PENDING") || status.equals("LATE") || status.equals("DONE")) {
             if(persistenceMethod.equals("MONGO") || persistenceMethod.equals("POSTGRES")) {
-                resultClass.setResult(logicEngine.CountTodoFromDataBase(persistenceMethod, status));
+                rawIDCount = logicEngine.CountTodoFromDataBase(persistenceMethod, status);
+                if(rawIDCount != -1)
+                    resultClass.setResult(rawIDCount);
+                else
+                    return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(500));
             }
             else
                 resultClass.setResult(logicEngine.CountByStatus(toDoClassList,status));
@@ -199,8 +213,14 @@ public class ToDoController {
         if(status.equals("ALL")){
             if(persistenceMethod == null)
                 filterdList = logicEngine.sortList(toDoClassList,sortBy);
-            else
-                filterdList = logicEngine.sortListFromDataBase(sortBy, persistenceMethod);
+            else {
+                try {
+                    filterdList = logicEngine.sortListFromDataBase(sortBy, persistenceMethod);
+                }
+                catch (Exception e){
+                    return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(500));
+                }
+            }
             resultClass.setResult(filterdList);
         }
         else{
@@ -209,8 +229,13 @@ public class ToDoController {
                         l -> l.getStatus().equals(status)).collect(Collectors.toList()), sortBy);
             }
             else{
-                filterdList = logicEngine.sortListFromDataBase(sortBy, persistenceMethod);
-                filterdList = filterdList.stream().filter(l->l.getStatus().equals(status)).collect(Collectors.toList());
+                try {
+                    filterdList = logicEngine.sortListFromDataBase(sortBy, persistenceMethod);
+                    filterdList = filterdList.stream().filter(l -> l.getStatus().equals(status)).collect(Collectors.toList());
+                }
+                catch (Exception e){
+                    return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(500));
+                }
             }
             resultClass.setResult(filterdList);
         }
@@ -286,27 +311,35 @@ public class ToDoController {
         handleLogRequest("/todo", "DELETE");
 
 
-        for(ToDoClass todo: toDoClassList){
-            if(todo.getId().equals(id)) {
-                toDoClassList.remove(todo);
-                resultClass.setResult(toDoClassList.size());
-                if(requestLogger.isDebugEnabled()){
-                    endTime = System.currentTimeMillis();
-                    handleLogDebugRequest(endTime - startTime);
-                }
-                todoLogger.info("Removing todo id " + id + logEndAddition());
-                if(todoLogger.isDebugEnabled()){
-                    todoLogger.debug("After removing todo id [" + id + "] there are " + toDoClassList.size() + " TODOs in the system" + logEndAddition());
-                }
-                return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
-            }
+//        for(ToDoClass todo: toDoClassList){
+//            if(todo.getId().equals(id)) {
+//                toDoClassList.remove(todo);
+//                resultClass.setResult(toDoClassList.size());
+//                if(requestLogger.isDebugEnabled()){
+//                    endTime = System.currentTimeMillis();
+//                    handleLogDebugRequest(endTime - startTime);
+//                }
+//                todoLogger.info("Removing todo id " + id + logEndAddition());
+//                if(todoLogger.isDebugEnabled()){
+//                    todoLogger.debug("After removing todo id [" + id + "] there are " + toDoClassList.size() + " TODOs in the system" + logEndAddition());
+//                }
+//                return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
+//            }
+//        }
+        ToDoClass todoToDelete = logicEngine.getTodoByIDFromDataBase(id);
+        if(todoToDelete == null) {
+            DeleteErrorClass deleteResultClass = new DeleteErrorClass("Error: no such TODO with id " + id.toString());
+            return new ResponseEntity<>(gson.toJson(deleteResultClass), HttpStatusCode.valueOf(404));
         }
-        DeleteErrorClass deleteResultClass = new DeleteErrorClass("Error: no such TODO with id " + id.toString());
-        todoLogger.error("Error: no such TODO with id " + id + logEndAddition());
-        if(requestLogger.isDebugEnabled()){
-            endTime = System.currentTimeMillis();
-            handleLogDebugRequest(endTime - startTime);
+        else{
+            resultClass.setResult(logicEngine.DeleteTodoFromDataBases(todoToDelete.getId()));
+            return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(200));
         }
-        return new ResponseEntity<>(gson.toJson(deleteResultClass), HttpStatusCode.valueOf(404));
+//        todoLogger.error("Error: no such TODO with id " + id + logEndAddition());
+//        if(requestLogger.isDebugEnabled()){
+//            endTime = System.currentTimeMillis();
+//            handleLogDebugRequest(endTime - startTime);
+//        }
+
     }
 }

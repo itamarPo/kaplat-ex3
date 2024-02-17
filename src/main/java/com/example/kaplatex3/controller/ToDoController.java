@@ -11,14 +11,13 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoDatabase;
+
 
 
 import java.time.Instant;
@@ -44,28 +43,6 @@ public class ToDoController {
         this.logicEngine = logicEngine;
         this.currentID = 0;
         this.requestLogNumber = 0;
-        this.ConnectToMongoDB();
-    }
-
-    private void ConnectToMongoDB() {
-        ServerApi serverApi = ServerApi.builder()
-                .version(ServerApiVersion.V1)
-                .build();
-        MongoClientSettings settings = MongoClientSettings.builder()
-                .applyConnectionString(new ConnectionString("localhost:27017"))
-                .serverApi(serverApi)
-                .build();
-        try (MongoClient mongoClient = MongoClients.create(settings)) {
-            MongoDatabase database = mongoClient.getDatabase("admin");
-            try {
-                // Send a ping to confirm a successful connection
-                Bson command = new BsonDocument("ping", new BsonInt64(1));
-                Document commandResult = database.runCommand(command);
-                System.out.println("Pinged your deployment. You successfully connected to MongoDB!");
-            } catch (MongoException me) {
-                System.err.println(me);
-            }
-        }
     }
 
     public static String logEndAddition(){

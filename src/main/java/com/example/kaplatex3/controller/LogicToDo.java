@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 
+import javax.sql.DataSource;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,12 +37,14 @@ public class LogicToDo {
 
     private final MongoTemplate mongoTemplate;
     //private MongoDatabase mongoDatabase;
+    private DataSource dataSource;
     private Connection postGresConnection;
 
     @Autowired
-    public LogicToDo(MongoTemplate mongoTemplate) {
+    public LogicToDo(MongoTemplate mongoTemplate, DataSource dataSource) {
        this.mongoTemplate = mongoTemplate;
-        createProstegConnection();
+       this.dataSource = dataSource;
+       createProstegConnection();
     }
 
     private void createProstegConnection() {
@@ -50,7 +53,8 @@ public class LogicToDo {
         String password = "docker"; // Replace yourpassword with your actual password
 
         // Establishing a connection
-        try (Connection postGresConnection = DriverManager.getConnection(url, username, password)) {
+        try {
+            Connection postGresConnection = dataSource.getConnection();
             this.postGresConnection = postGresConnection;
             System.out.println("Connected to the PostgreSQL database!");
             //String switchDatabaseQuery = "SET DATABASE_NAME TO todos";
@@ -133,7 +137,7 @@ public class LogicToDo {
                     count().as("count")
             );
 
-            AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "todo", Document.class);
+            AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "todos", Document.class);
             return results.getMappedResults().size();
     }
 
@@ -154,24 +158,30 @@ public class LogicToDo {
 
     public int CountTodoFromDataBase(String dataBase, String... status) {
         int count = 0;
+        String theStatus = null;
         //MongoCollection<Document> collection;
         if (dataBase.equals("MONGO")) {
             //List<Integer> rawIds;
             //collection = mongoDatabase.getCollection("todos");
-            if (status == null)
+            for (String s: status)
+                theStatus = s;
+            if (theStatus == null || theStatus.equals("ALL"))
                 count = countTodoFromMongoALL();
             else {
-               count = getDistinctRawidsWithStatus(status[0]);
+               count = getDistinctRawidsWithStatus(theStatus);
             }
         } else {
             String query;
-            if(status == null)
-                query = "SELECT COUNT(rawid) AS rawIdcount FROM todo";
+            for (String s: status)
+                theStatus = s;
+            if(theStatus == null || theStatus.equals("ALL"))
+                query = "SELECT COUNT(rawid) AS rawIdcount FROM todos";
             else {
-                query = "SELECT COUNT(rawid) AS rawIdcount FROM todo WHERE status = " + status;
+                query = "SELECT COUNT(rawid) AS rawIdcount FROM todos WHERE state = " + theStatus.toUpperCase();
             }
-            try (Statement statement = postGresConnection.createStatement()) {
+            try {
                 // Executing the query
+                Statement statement = postGresConnection.createStatement();
                 try (ResultSet resultSet = statement.executeQuery(query)) {
                     // Checking if the result set has any rows
                     if (resultSet.next()) {
@@ -207,8 +217,9 @@ public class LogicToDo {
                        todoClassForMongoDB.getContent(), todoClassForMongoDB.getDueDate(), todoClassForMongoDB.getStatus()));
             }
         } else {
-            try (Statement statement = postGresConnection.createStatement()) {
-                query = "SELECT * FROM todo";
+            try {
+                Statement statement = postGresConnection.createStatement();
+                query = "SELECT * FROM todos";
                 try (ResultSet resultSet = statement.executeQuery(query)) {
                     // Iterating through the result set
                     while (resultSet.next()) {
@@ -243,15 +254,16 @@ public class LogicToDo {
 
     private ToDoClass getToDoClassFromPostGres(Integer rawID) {
         ToDoClass todo;
-        String query = "SELECT * FROM todo WHERE rawid = " + rawID;
-        try(Statement statement = postGresConnection.createStatement()) {
+        String query = "SELECT * FROM todos WHERE rawid = " + rawID;
+        try{
+            Statement statement = postGresConnection.createStatement();
             try (ResultSet resultSet = statement.executeQuery(query)) {
                 // Checking if the result set has any rows
                 if (resultSet.next()) {
                     int rawid = resultSet.getInt("rawid");
                     String title = resultSet.getString("title");
                     String content = resultSet.getString("content");
-                    String status = resultSet.getString("status");
+                    String status = resultSet.getString("state");
                     long duedate = resultSet.getLong("duedate");
                     todo = new ToDoClass(rawid, title, content, duedate, status);
                 }
@@ -293,7 +305,7 @@ public class LogicToDo {
         queryMongo.addCriteria(Criteria.where("rawid").is(rawID));
         Update update = new Update();
         update.set("state", newStatus);
-        String query = String.format("UPDATE todo SET state = %s WHERE rawid = %d",newStatus, rawID);
+        String query = String.format("UPDATE todos SET state = %s WHERE rawid = %d",newStatus, rawID);
         try {
             mongoTemplate.updateFirst(queryMongo, update, TodoClassForMongoDB.class);
             PreparedStatement preparedStatement = postGresConnection.prepareStatement(query);
@@ -333,16 +345,17 @@ public class LogicToDo {
     }
 
     private Integer createNewTodoInPostGresDataBase(ToDoJsonClass newTodo) {
-        String query = "SELECT MAX(rawid) AS max_rawid FROM todo";
+        String query = "SELECT MAX(rawid) AS max_rawid FROM todos";
 
         // Creating a statement
-        try (Statement statement = postGresConnection.createStatement()) {
+        try {
+            Statement statement = postGresConnection.createStatement();
             // Executing the query
             try (ResultSet resultSet = statement.executeQuery(query)) {
                 // Checking if the result set has any rows
                 if (resultSet.next()) {
                     int maxRawid = resultSet.getInt("max_rawid");
-                    String queryInsert = "INSERT INTO todo (rawid, title, content, duedate, state) VALUES (" + (maxRawid + 1) +
+                    String queryInsert = "INSERT INTO todos (rawid, title, content, duedate, state) VALUES (" + (maxRawid + 1) +
                             ", " + newTodo.getTitle() + ", " + newTodo.getContent() + ", " + newTodo.getDueDate() +
                             ", PENDING)";
                     //System.out.println("Maximum rawid: " + maxRawid);
@@ -385,7 +398,7 @@ public class LogicToDo {
 
     public Integer DeleteTodoFromDataBases(Integer rawID) {
         Integer count = 0;
-        String query = String.format("DELETE FROM todo WHERE rawid = %d", rawID);
+        String query = String.format("DELETE FROM todos WHERE rawid = %d", rawID);
 //        MongoCollection<Document> collection = mongoDatabase.getCollection("todos");
 //        Document filter = new Document("rawid", rawID);
 //        collection.deleteOne(filter);
@@ -397,7 +410,8 @@ public class LogicToDo {
         mongoTemplate.remove(queryForMongo, TodoClassForMongoDB.class);
 
         count = CountTodoFromDataBase("MONGO");
-        try (PreparedStatement preparedStatement = postGresConnection.prepareStatement(query)) {
+        try {
+            PreparedStatement preparedStatement = postGresConnection.prepareStatement(query);
             preparedStatement.executeUpdate();
         }
      catch (SQLException e) {

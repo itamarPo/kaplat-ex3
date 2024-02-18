@@ -12,7 +12,7 @@ services:
       - "27017:27017"
   app:
     image: itamarpo/kaplat:7.0
-    #restart: on-failure:2
+    restart: on-failure:2
     ports:
       - "3769:9285"
     depends_on:

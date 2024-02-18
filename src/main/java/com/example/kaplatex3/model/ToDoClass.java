@@ -1,8 +1,14 @@
 package com.example.kaplatex3.model;
 
+import jakarta.persistence.*;
+import lombok.Data;
+
 import java.util.Date;
 
+@Entity
 public class ToDoClass {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     private String title;
     private String content;
@@ -15,6 +21,10 @@ public class ToDoClass {
         this.content = content;
         this.dueDate = dueDate;
         Status = status;
+    }
+
+    public ToDoClass() {
+
     }
 
     public void setStatus(String status) {

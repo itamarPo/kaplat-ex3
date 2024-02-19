@@ -211,6 +211,7 @@ public class ToDoController {
                     filterdList = filterdList.stream().filter(l -> l.getStatus().equals(status)).collect(Collectors.toList());
                 }
                 catch (Exception e){
+                    System.out.println(e.getMessage());
                     return new ResponseEntity<>(gson.toJson(resultClass), HttpStatusCode.valueOf(500));
                 }
             }

@@ -15,7 +15,7 @@ public class TodoClassForMongoDB{
     private String title;
     private String content;
     private Long dueDate;
-    private String Status;
+    private String state;
 
     public TodoClassForMongoDB(int id, int rawid ,String title, String content, Long dueDate, String status) {
         this.id = id;
@@ -23,13 +23,14 @@ public class TodoClassForMongoDB{
         this.title = title;
         this.content = content;
         this.dueDate = dueDate;
-        Status = status;
+        this.state = status;
     }
 
     public void setStatus(String status) {
-        Status = status;
+        state = status;
     }
 
+    //public Integer getId(){return id;}
     public Integer getRawId() {
         return rawid;
     }
@@ -47,6 +48,6 @@ public class TodoClassForMongoDB{
     }
 
     public String getStatus() {
-        return Status;
+        return state;
     }
 }

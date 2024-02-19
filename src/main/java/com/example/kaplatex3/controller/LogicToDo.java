@@ -4,6 +4,8 @@ import com.example.kaplatex3.model.ToDoClass;
 import com.example.kaplatex3.model.ToDoJsonClass;
 import com.example.kaplatex3.model.TodoClassForMongoDB;
 import com.mongodb.*;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import org.bson.BsonDocument;
@@ -13,6 +15,8 @@ import org.bson.conversions.Bson;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
+import org.springframework.data.mongodb.core.aggregation.ConvertOperators;
+import org.springframework.data.mongodb.core.aggregation.GroupOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -132,28 +136,36 @@ public class LogicToDo {
     }
 
     private Integer countTodoFromMongoALL(){
-            Aggregation aggregation = newAggregation(
-                    group("rawid"),
-                    count().as("count")
-            );
+           // Aggregation aggregation = newAggregation(
+           //         group("rawid"),
+           //         count().as("count")
+          //  );
 
-            AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "todos", Document.class);
-            return results.getMappedResults().size();
+           // AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "todos", Document.class);
+            //return results.
+        List<Integer> distinctRawIds = mongoTemplate.query(TodoClassForMongoDB.class)
+                .distinct("rawid")
+                .as(Integer.class)
+                .all();
+        return distinctRawIds.size();
     }
 
     public Integer getDistinctRawidsWithStatus(String status) {
-        Aggregation aggregation = newAggregation(
-                match(Criteria.where("state").is(status)),
-                group("rawid"),
-                project("rawid").andExclude("_id")
-        );
-
-        AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "todo", Document.class);
-        List<Integer> rawids = new ArrayList<>();
-        for (Document document : results.getMappedResults()) {
-            rawids.add(document.getInteger("rawid"));
-        }
-        return rawids.size();
+//        Aggregation aggregation = newAggregation(
+//                match(Criteria.where("state").is(status)),
+//                group("rawid"),
+//                project("rawid").andExclude("_id")
+//        );
+//
+//        AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "todos", Document.class);
+//        List<Integer> rawids = new ArrayList<>();
+//        for (Document document : results.getMappedResults()) {
+//            rawids.add(document.getInteger("rawid"));
+//        }
+//        return rawids.size();
+        Query query = new Query(Criteria.where("state").is(status));
+        List<Integer> rawIds = mongoTemplate.findDistinct(query, "rawid", "todos", Integer.class);
+        return rawIds.size();
     }
 
     public int CountTodoFromDataBase(String dataBase, String... status) {
@@ -177,12 +189,13 @@ public class LogicToDo {
             if(theStatus == null || theStatus.equals("ALL"))
                 query = "SELECT COUNT(rawid) AS rawIdcount FROM todos";
             else {
-                query = "SELECT COUNT(rawid) AS rawIdcount FROM todos WHERE state = " + theStatus.toUpperCase();
+                query = "SELECT COUNT(rawid) AS rawIdcount FROM todos WHERE state = ?";
             }
             try {
                 // Executing the query
-                Statement statement = postGresConnection.createStatement();
-                try (ResultSet resultSet = statement.executeQuery(query)) {
+                PreparedStatement preparedStatement = postGresConnection.prepareStatement(query);
+                preparedStatement.setString(1, theStatus);
+                ResultSet resultSet = preparedStatement.executeQuery(query);
                     // Checking if the result set has any rows
                     if (resultSet.next()) {
                         int rawIdcount = resultSet.getInt("rawIdcount");
@@ -192,7 +205,6 @@ public class LogicToDo {
                         System.out.println("No rows returned from the query.");
                         count = 0;
                     }
-                }
             }
             catch (SQLException e) {
                 System.err.println("Failed to connect to the PostgreSQL database or execute the query!");
@@ -204,34 +216,50 @@ public class LogicToDo {
         return count;
     }
 
-    public List<TodoClassForMongoDB> getAllTodos() {
-        return mongoTemplate.findAll(TodoClassForMongoDB.class);
+    public List<ToDoClass> getAllTodos() {
+        MongoCollection<Document> collection = mongoTemplate.getCollection("todos");
+        MongoCursor<Document> cursor = collection.find().iterator();
+        List<ToDoClass> todos = new ArrayList<>();
+        while (cursor.hasNext()) {
+            Document doc = cursor.next();
+            ToDoClass todo = new ToDoClass(doc.getInteger("rawid"), doc.getString("title"), doc.getString("content"), (long)doc.getDouble("duedate").doubleValue(),
+                    doc.getString("state"));
+//            todo.setId(doc.getInteger("id"));
+//            todo.setRawid(doc.getInteger("rawid"));
+//            todo.setTitle(doc.getString("title"));
+//            todo.setContent(doc.getString("content"));
+//            todo.setDueDate(doc.getLong("dueDate"));
+//            todo.setState(doc.getString("state"));
+            todos.add(todo);
+        }
+        cursor.close();
+        return todos;
     }
     public List<ToDoClass> sortListFromDataBase(String sortBy, String dataBase) throws Exception{
         List<ToDoClass> todoList = new ArrayList<>();
         String query;
         if (dataBase.equals("MONGO")) {
-            List<TodoClassForMongoDB> todoListFromMongo = getAllTodos();
-            for(TodoClassForMongoDB todoClassForMongoDB: todoListFromMongo){
-               todoList.add(new ToDoClass(todoClassForMongoDB.getRawId(), todoClassForMongoDB.getTitle(),
-                       todoClassForMongoDB.getContent(), todoClassForMongoDB.getDueDate(), todoClassForMongoDB.getStatus()));
-            }
+//            List<TodoClassForMongoDB> todoListFromMongo = getAllTodos();
+//            for(TodoClassForMongoDB todoClassForMongoDB: todoListFromMongo){
+//               todoList.add(new ToDoClass(todoClassForMongoDB.getRawId(), todoClassForMongoDB.getTitle(),
+//                       todoClassForMongoDB.getContent(), todoClassForMongoDB.getDueDate(), todoClassForMongoDB.getStatus()));
+//            }
+            todoList = getAllTodos();
         } else {
             try {
                 Statement statement = postGresConnection.createStatement();
                 query = "SELECT * FROM todos";
-                try (ResultSet resultSet = statement.executeQuery(query)) {
+                ResultSet resultSet = statement.executeQuery(query);
                     // Iterating through the result set
                     while (resultSet.next()) {
                         int rawid = resultSet.getInt("rawid");
                         String title = resultSet.getString("title");
                         String content = resultSet.getString("content");
-                        String status = resultSet.getString("status");
+                        String status = resultSet.getString("state");
                         long duedate = resultSet.getLong("duedate");
                         ToDoClass toDoClass = new ToDoClass(rawid, title, content, duedate, status);
                         todoList.add(toDoClass);
                     }
-                }
             }
             catch(Exception e){
                 throw e;
@@ -244,10 +272,10 @@ public class LogicToDo {
     public ToDoClass getTodoByIDFromDataBase(Integer rawID) {
         ToDoClass toDoClass = getToDoClassFromMongo(rawID);
         if(toDoClass != null)
-            if (toDoClass.equals(getToDoClassFromPostGres(rawID)))
+            //if (toDoClass.equals(getToDoClassFromPostGres(rawID)))
                 return toDoClass;
-            else
-                return null;
+            //else
+              //  return null;
         else
             return null;
     }
@@ -288,28 +316,42 @@ public class LogicToDo {
 //            return todo;
 //        } else
 //            return null;
-
-        Query query = new Query();
-        query.addCriteria(Criteria.where("rawid").is(rawID));
-        TodoClassForMongoDB todoClassForMongoDB = mongoTemplate.findOne(query, TodoClassForMongoDB.class);
-        if(todoClassForMongoDB != null){
-            ToDoClass todo = new ToDoClass(todoClassForMongoDB.getRawId(), todoClassForMongoDB.getTitle(), todoClassForMongoDB.getContent()
-            , todoClassForMongoDB.getDueDate(), todoClassForMongoDB.getStatus());
+//
+//        Query query = new Query();
+//        query.addCriteria(Criteria.where("rawid").is(rawID));
+//        TodoClassForMongoDB todoClassForMongoDB = mongoTemplate.findOne(query, TodoClassForMongoDB.class);
+//        if(todoClassForMongoDB != null){
+//            ToDoClass todo = new ToDoClass(todoClassForMongoDB.getRawId(), todoClassForMongoDB.getTitle(), todoClassForMongoDB.getContent()
+//            , todoClassForMongoDB.getDueDate(), todoClassForMongoDB.getStatus());
+//            return todo;
+//        }
+//        return null;
+        MongoCollection<Document> collection = mongoTemplate.getCollection("todos");
+        BasicDBObject query = new BasicDBObject();
+        query.put("rawid", rawID);
+        Document document = collection.find(query).first();
+        if (document != null) {
+            ToDoClass todo = new ToDoClass(document.getInteger("rawid"), document.getString("title"), document.getString("content"),
+                    (long)document.getDouble("duedate").doubleValue(), document.getString("state"));
+            // Convert Document to Todo object here
             return todo;
         }
         return null;
     }
+
 
     public void UpdateDataBasesStatusByID(String newStatus, int rawID) throws Exception {
         Query queryMongo = new Query();
         queryMongo.addCriteria(Criteria.where("rawid").is(rawID));
         Update update = new Update();
         update.set("state", newStatus);
-        String query = String.format("UPDATE todos SET state = %s WHERE rawid = %d",newStatus, rawID);
+        String query = "UPDATE todos SET state = ? WHERE rawid = ?";
         try {
-            mongoTemplate.updateFirst(queryMongo, update, TodoClassForMongoDB.class);
             PreparedStatement preparedStatement = postGresConnection.prepareStatement(query);
+            preparedStatement.setString(1, newStatus);
+            preparedStatement.setInt(2, rawID);
             preparedStatement.executeUpdate();
+            mongoTemplate.updateFirst(queryMongo, update, TodoClassForMongoDB.class);
         } catch (Exception exception) {
             throw exception;
         }
@@ -320,8 +362,21 @@ public class LogicToDo {
     }
 
     private boolean checkIfTodoExistInPostGres(String title) {
+        String query = "SELECT EXISTS(SELECT 1 FROM todos WHERE title = ?)";
+        try (PreparedStatement preparedStatement = postGresConnection.prepareStatement(query)) {
+            preparedStatement.setString(1, title);
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getBoolean(1);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Failed to check if title exists in todos!");
+            e.printStackTrace();
+        }
         return false;
     }
+
 
     private boolean checkIfTodoExistInMongo(String title) {
 //        MongoCollection<Document> collection = mongoDatabase.getCollection("todos");
@@ -351,20 +406,18 @@ public class LogicToDo {
         try {
             Statement statement = postGresConnection.createStatement();
             // Executing the query
-            try (ResultSet resultSet = statement.executeQuery(query)) {
-                // Checking if the result set has any rows
-                if (resultSet.next()) {
-                    int maxRawid = resultSet.getInt("max_rawid");
-                    String queryInsert = "INSERT INTO todos (rawid, title, content, duedate, state) VALUES (" + (maxRawid + 1) +
-                            ", " + newTodo.getTitle() + ", " + newTodo.getContent() + ", " + newTodo.getDueDate() +
-                            ", PENDING)";
-                    //System.out.println("Maximum rawid: " + maxRawid);
-                    statement.executeUpdate(queryInsert);
-                    return maxRawid + 1;
-                } else {
-                    System.out.println("No rows returned from the query.");
-                    return -1;
-                }
+            ResultSet resultSet = statement.executeQuery(query);
+            if (resultSet.next()) {
+                int maxRawid = resultSet.getInt("max_rawid");
+                String queryInsert = "INSERT INTO todos (rawid, title, content, duedate, state) VALUES (" + (maxRawid + 1) +
+                        ", " + newTodo.getTitle() + ", " + newTodo.getContent() + ", " + newTodo.getDueDate() +
+                        ", PENDING)";
+                //System.out.println("Maximum rawid: " + maxRawid);
+                statement.executeUpdate(queryInsert);
+                return maxRawid + 1;
+            } else {
+                System.out.println("No rows returned from the query.");
+                return -1;
             }
         }
         catch(SQLException e)
@@ -384,16 +437,26 @@ public class LogicToDo {
 //                .append("content", newTodo.getContent()).append("duedate", newTodo.getContent());
 //        collection.insertOne(newDoc);
 //        return maxRawId;
-        Aggregation aggregation = newAggregation(group().max("rawid").as("maxRawid"));
-        Aggregation aggregationForId = newAggregation(group().max("id").as("maxid"));
-        AggregationResults<Document> resultsMaxRawId = mongoTemplate.aggregate(aggregation, "todo", Document.class);
-        AggregationResults<Document> resultsMaxId = mongoTemplate.aggregate(aggregation, "todo", Document.class);
-        Document resultDocumentMaxRawId = resultsMaxRawId.getUniqueMappedResult();
-        Document resultDocumentMaxId = resultsMaxId.getUniqueMappedResult();
-        TodoClassForMongoDB newTodoClass = new TodoClassForMongoDB(resultDocumentMaxId.getInteger("maxid"),
-                resultDocumentMaxRawId.getInteger("maxRawid"), newTodo.getTitle(), newTodo.getContent(), newTodo.getDueDate(), "PENDING");
+        Aggregation aggregation = Aggregation.newAggregation(Aggregation.group().max("rawid").as("maxRawId"));
+        AggregationResults<Document> result = mongoTemplate.aggregate(aggregation, "todos", Document.class);
+        Document uniqueRawIds = result.getUniqueMappedResult();
+        if (uniqueRawIds != null) {
+             //uniqueRawIds.getInteger("maxRawId", 0);
+        } else {
+            return 0; // or throw an exception, depending on your requirements
+        }
+        Aggregation aggregationMaxId = Aggregation.newAggregation(Aggregation.group().max("_id").as("maxId"));
+        AggregationResults<Document> resultMaxId = mongoTemplate.aggregate(aggregation, "todos", Document.class);
+        Document uniqueIds = result.getUniqueMappedResult();
+        if (uniqueIds != null) {
+           // return uniqueRawIds.getInteger("maxRawId", 0);
+        } else {
+            return 0; // or throw an exception, depending on your requirements
+        }
+        TodoClassForMongoDB newTodoClass = new TodoClassForMongoDB(uniqueIds.getInteger("maxId", 0),
+                uniqueRawIds.getInteger("maxRawId", 0), newTodo.getTitle(), newTodo.getContent(), newTodo.getDueDate(), "PENDING");
         mongoTemplate.insert(newTodoClass);
-        return resultDocumentMaxRawId.getInteger("maxRawid");
+        return uniqueRawIds.getInteger("maxRawid", 0);
     }
 
     public Integer DeleteTodoFromDataBases(Integer rawID) {

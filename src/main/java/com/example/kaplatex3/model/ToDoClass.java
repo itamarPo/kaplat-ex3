@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.Objects;
 
 @Entity
 public class ToDoClass {
@@ -49,5 +50,25 @@ public class ToDoClass {
 
     public String getStatus() {
         return Status;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        ToDoClass checkedObj = (ToDoClass) obj;
+       // return this.id == checkedObj.getId() && this.content == checkedObj.getContent() && this.dueDate == checkedObj.getDueDate()
+       //         && this.title == checkedObj.getTitle() && this.Status == checkedObj.getStatus();
+        if(this.id != checkedObj.getId())
+            return false;
+        else if (!this.Status.equals(checkedObj.getStatus()))
+            return false;
+        else if (!this.title.equals(checkedObj.getTitle()))
+            return false;
+        else if (this.dueDate.longValue() != checkedObj.getDueDate().longValue()) {
+            System.out.println("WHYYY");
+            return false;
+        }
+        else if (!this.content.equals(checkedObj.getContent()))
+            return false;
+        return true;
     }
 }
